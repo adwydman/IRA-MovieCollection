@@ -77,9 +77,7 @@ server.prepareRoutes = function() {
                         });
                     }
                 })
-                
             }
-
         }
     });
 
@@ -123,7 +121,6 @@ server.prepareRoutes = function() {
                 reply(return_object).code(403);
             }
             else {
-
                 database.get("users", {"name": name}, function(data){
                     if (data[0] !== undefined) {
                         var stored_password = data[0].password;
@@ -145,10 +142,10 @@ server.prepareRoutes = function() {
                     }
                     else {
                         var return_object = {
-                            "code": 401,
+                            "code": 400,
                             "message": "User doesn't exist"
                         }
-                        reply(return_object).code(401);
+                        reply(return_object).code(400);
                     }
                 });
             }
@@ -163,13 +160,22 @@ server.prepareRoutes = function() {
             if (hasAccess) {
                 var name = request.payload.name;
                 var year = request.payload.year;
-                database.post("movies", {"name": name, "year": year}, function(data){
+                if (name === undefined || year === undefined) {
                     var return_object = {
-                        count: data.length,
-                        users: data
+                    "code": 403,
+                    "message": "Missing name of year"
                     }
-                    reply(return_object).code(201);
-                });
+                    reply(return_object).code(403);
+                }
+                else {
+                    database.post("movies", {"name": name, "year": year}, function(data){
+                        var return_object = {
+                            count: data.length,
+                            users: data
+                        }
+                        reply(return_object).code(201);
+                    });
+                }
             }
         }
     });

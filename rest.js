@@ -1,5 +1,6 @@
 var Hapi = require('hapi');
-var database = require('./database.js')
+var database = require('./database.js');
+var passwordHash = require('password-hash');
 
 var server = new Hapi.Server();
 server.connection({ 
@@ -48,20 +49,36 @@ server.prepareRoutes = function() {
         handler: function(request, reply) {
             console.log("POST /users")
             var name = request.payload.name;
-            database.get("users", {"name": name}, function(data){
-                if (data[0] != undefined) {
-                    reply({"register": "rejected"}).code(403);
+            var pass = request.payload.password;
+            if (name === undefined || pass === undefined) {
+                var return_object = {
+                    "code": 403,
+                    "message": "Missing username or password"
                 }
-                else {
-                    database.post("users", {"name": name}, function(data){
+                reply(return_object).code(403);
+            }
+            else {
+                var password = passwordHash.generate(pass);
+                database.get("users", {"name": name}, function(data){
+                    if (data[0] != undefined) {
                         var return_object = {
-                            count: data.length,
-                            users: data
+                            "code": 409,
+                            "message": "User with given username already exists"
                         }
-                        reply(return_object).code(201);
-                    });
-                }
-            })
+                        reply(return_object).code(409);
+                    }
+                    else {
+                        database.post("users", {"name": name, "password": password}, function(data){
+                            var return_object = {
+                                count: data.length,
+                                users: data
+                            }
+                            reply(return_object).code(201);
+                        });
+                    }
+                })
+                
+            }
 
         }
     });
@@ -97,12 +114,44 @@ server.prepareRoutes = function() {
         handler: function(request, reply) {
             console.log("POST /login")
             var name = request.payload.name;
-            database.get("users", {"name": name}, function(data){
-                if (data[0] !== undefined)
-                    reply({"login": "successful"}).code(200);
-                else
-                    reply({"login": "rejected"}).code(401);
-            });
+            var pass = request.payload.password;
+            if (name === undefined || pass === undefined) {
+                var return_object = {
+                    "code": 403,
+                    "message": "Missing username or password"
+                }
+                reply(return_object).code(403);
+            }
+            else {
+
+                database.get("users", {"name": name}, function(data){
+                    if (data[0] !== undefined) {
+                        var stored_password = data[0].password;
+                        var valid_credentials = passwordHash.verify(pass, stored_password);
+                        if (valid_credentials){
+                            var return_object = {
+                                "code": 200,
+                                "message": "Login successful"
+                            }
+                            reply(return_object).code(200);
+                        }
+                        else {
+                            var return_object = {
+                                "code": 400,
+                                "message": "Wrong password"
+                            }
+                            reply(return_object).code(400) 
+                        }
+                    }
+                    else {
+                        var return_object = {
+                            "code": 401,
+                            "message": "User doesn't exist"
+                        }
+                        reply(return_object).code(401);
+                    }
+                });
+            }
         }
     });
 
@@ -114,8 +163,6 @@ server.prepareRoutes = function() {
             if (hasAccess) {
                 var name = request.payload.name;
                 var year = request.payload.year;
-                console.log(request.payload)
-                console.log(year)
                 database.post("movies", {"name": name, "year": year}, function(data){
                     var return_object = {
                         count: data.length,

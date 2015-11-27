@@ -1,5 +1,3 @@
-'use strict'
-
 var Hapi = require('hapi');
 var database = require('./database.js');
 var passwordHash = require('password-hash');
@@ -7,19 +5,8 @@ var passwordHash = require('password-hash');
 var server = new Hapi.Server();
 server.connection({ port: 8000 });
 
-/*
-server.state('data', {
-    ttl: null,
-    isSecure: true,
-    isHttpOnly: true,
-    encoding: 'base64json',
-    clearInvalid: false, // remove invalid cookies
-    strictHeader: true // don't allow violations of RFC 6265
-});
-*/
-
 server.state('session', {
-    ttl: 24 * 60 * 60 * 1000,     // One day
+    ttl: 15 * 60 * 1000,  // 15 minutes
     isSecure: false,
     strictHeader: false,
 });
@@ -30,47 +17,51 @@ server.prepareRoutes = function() {
         path: "/login",
         config: {
             state: {
-                parse: 'false',
+                parse: 'true',
                 failAction: 'log'
             },
             handler: function(request, reply) {
                 console.log("POST /login")
-                var name = request.payload.username;
-                var pass = request.payload.password;
-                if (name === undefined || pass === undefined) {
-                    var return_object = { 
-                        "code": 403, 
-                        "message": "Missing username or password" 
-                    }
-                    reply(return_object).code(return_object.code);
-                }
+                if (request.state.session) 
+                    reply().redirect("/movies")
                 else {
-                    database.get("users", {username: name}, {}, function(data){
-                        var return_object = {};
-                        if (data[0] !== undefined) {
-                            if (passwordHash.verify(pass, data[0].password)) {
-                                return_object = { 
-                                    code: 200, 
-                                    message: "Login successful" 
+                    var name = request.payload.username;
+                    var pass = request.payload.password;
+                    if (name === undefined || pass === undefined) {
+                        var return_object = { 
+                            "code": 403, 
+                            "message": "Missing username or password" 
+                        }
+                        reply(return_object).code(return_object.code);
+                    }
+                    else {
+                        database.get("users", {username: name}, {}, function(data){
+                            var return_object = {};
+                            if (data[0] !== undefined) {
+                                if (passwordHash.verify(pass, data[0].password)) {
+                                    return_object = { 
+                                        code: 200, 
+                                        message: "Login successful" 
+                                    }
+                                    var sessionId = Math.random().toString();
+                                    database.post("sessions", {"username": name, "sessionId": sessionId}, function(data) {
+                                        reply(return_object).code(return_object.code).state('session', sessionId);
+                                    })
                                 }
-                                var sessionId = Math.random().toString();
-                                database.post("sessions", {"username": name, "sessionId": sessionId}, function(data) {
-                                    reply(return_object).code(return_object.code).state("session", sessionId);
-                                })
+                                else {
+                                    return_object = { 
+                                        code: 400, 
+                                        message: "Wrong password" 
+                                    }
+                                    reply(return_object).code(return_object.code);
+                                }
                             }
                             else {
-                                return_object = { 
-                                    code: 400, 
-                                    message: "Wrong password" 
-                                }
+                                return_object = { "code": 400, "message": "User doesn't exist" }
                                 reply(return_object).code(return_object.code);
                             }
-                        }
-                        else {
-                            return_object = { "code": 400, "message": "User doesn't exist" }
-                            reply(return_object).code(return_object.code);
-                        }
-                    });
+                        });
+                    }
                 }
             } 
         }
@@ -81,10 +72,13 @@ server.prepareRoutes = function() {
         path: "/logout",
         config: {
             handler: function(request, reply) {
-                reply({
-                    code: 200,
-                    message: "Logged out successfully"
-                }).code(200)
+                var return_object = {};
+                if (request.state.session) {
+                    return_object = { code: 200, message: "Logged out successfully" }
+                    reply(return_object).code(return_object.code).unstate('session');
+                }
+                else 
+                    reply().redirect("/movies");
             }
         }
     })
@@ -94,15 +88,34 @@ server.prepareRoutes = function() {
         path: "/users/{id?}",
         config: {
             handler: function(request, reply) {
-                console.log(request.state)
                 console.log("GET /users")
-                database.get("users", {}, {username: 1}, function(data){
-                    var return_object = {
-                        count: data.length,
-                        users: data
-                    }
-                    reply(return_object).code(200);
-                });  
+                if (request.state.session) {
+                    var sessionId = request.state.session;
+                    database.get("sessions", {"sessionId": sessionId}, {}, function(data) {
+                        var userDetails = data[0];
+                        if (userDetails.username === "admin") {
+                            if (request.params.id) {
+                                
+                            }
+                            else {
+                                database.get("users", {}, {}, function(data){
+                                    var return_object = {
+                                        count: data.length,
+                                        users: data
+                                    }
+                                    reply(return_object).code(200);
+                                });  
+                            }
+                        }
+                        else {
+                            var return_object = {
+                                code: 401,
+                                message: "You don't have the permission to see this page"
+                            }
+                            reply(return_object).code(return_object.code);
+                        }                            
+                    })
+                }
             }
         }
     });
@@ -182,20 +195,15 @@ server.prepareRoutes = function() {
             if (hasAccess) {
                 var name = request.payload.username;
                 var year = request.payload.year;
+                var return_object = {};
                 if (name === undefined || year === undefined) {
-                    var return_object = {
-                    "code": 403,
-                    "message": "Missing name of year"
-                    }
-                    reply(return_object).code(403);
+                    return_object = { code: 403, message: "Missing name of year" }
+                    reply(return_object).code(return_object.code);
                 }
                 else {
                     database.post("movies", {"username": name, "year": year}, function(data){
-                        var return_object = {
-                            count: data.length,
-                            users: data
-                        }
-                        reply(return_object).code(201);
+                        return_object = { code: 200, count: data.length, users: data }
+                        reply(return_object).code(return_object.code);
                     });
                 }
             }
@@ -279,7 +287,7 @@ server.prepareRoutes = function() {
             console.log("GET /movies/{id?}")
             if (request.params.id) {
                 var id = request.params.id;
-                database.get("movies", {"_id": id}, function(data){
+                database.get("movies", {"_id": id}, {}, function(data){
                     if (data.length > 0)
                         reply(data[0]).code(200);
                     else {
@@ -292,7 +300,7 @@ server.prepareRoutes = function() {
                 }); 
             }
             else {
-                database.get("movies", {}, function(data){
+                database.get("movies", {}, {}, function(data){
                     var return_object = {
                         count: data.length,
                         movies: data

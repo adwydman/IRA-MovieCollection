@@ -88,10 +88,8 @@ database.delete = function (collection, query, callback) {
     var collection_name = collection;
     MongoClient.connect(url, function(err, db) {
         removeDocument(db, query, collection, function() {
-            findDocuments(db, {}, collection_name, function(data) {
-                callback(data);
-                db.close();
-            })
+            callback();
+            db.close();
         });
     });
 }

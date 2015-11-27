@@ -23,7 +23,7 @@ server.prepareRoutes = function() {
             handler: function(request, reply) {
                 console.log("POST /login")
                 if (request.state.session) 
-                    reply().redirect("/movies")
+                    reply().redirect("/movies").code(302)
                 else {
                     var name = request.payload.username;
                     var pass = request.payload.password;
@@ -78,7 +78,7 @@ server.prepareRoutes = function() {
                     reply(return_object).code(return_object.code).unstate('session');
                 }
                 else 
-                    reply().redirect("/movies");
+                    reply().redirect("/movies").code(302);
             }
         }
     })
@@ -91,21 +91,22 @@ server.prepareRoutes = function() {
                 console.log("GET /users")
                 if (request.state.session) {
                     var sessionId = request.state.session;
+
                     database.get("sessions", {"sessionId": sessionId}, {}, function(data) {
                         var userDetails = data[0];
+                        var query = {};
                         if (userDetails.username === "admin") {
                             if (request.params.id) {
-                                
+                                query = { "_id": request.params.id };
                             }
-                            else {
-                                database.get("users", {}, {}, function(data){
-                                    var return_object = {
-                                        count: data.length,
-                                        users: data
-                                    }
-                                    reply(return_object).code(200);
-                                });  
-                            }
+                            database.get("users", query, {}, function(data){
+                                var return_object = {
+                                    code: 200,
+                                    count: data.length,
+                                    users: data
+                                }
+                                reply(return_object).code(return_object.code);
+                            });  
                         }
                         else {
                             var return_object = {
@@ -116,7 +117,43 @@ server.prepareRoutes = function() {
                         }                            
                     })
                 }
+                else {
+                    //http://stackoverflow.com/questions/2839585/what-is-correct-http-status-code-when-redirecting-to-a-login-page
+                    reply().redirect("/movies").code(302);
+                }
             }
+        }
+    });
+
+    
+    server.route({
+        method: "DELETE",
+        path: "/users/{id}",
+        handler: function(request, reply) {
+            console.log("DELETE /users/{id}")
+            var redirect = false;
+            if (request.state.session) {
+                var sessionId = request.state.session;
+
+                database.get("sessions", {"sessionId": sessionId}, {}, function(data) {
+                    var userDetails = data[0];
+                    if (userDetails.username === "admin") {
+                        var id = request.params.id;
+
+                        database.delete("users", {"_id": id}, function(){
+                            reply(return_object).code(200);
+                        });
+
+                    }
+                    else 
+                        redirect = true;
+                })
+            }
+            else 
+                redirect = true;
+            
+            if (redirect) 
+                reply().redirect("/movies").code(302);
         }
     });
 
@@ -159,32 +196,6 @@ server.prepareRoutes = function() {
         }
     });
 
-    /*
-    server.route({
-        method: "DELETE",
-        path: "/users/{id}",
-        handler: function(request, reply) {
-            console.log("DELETE /users/{id}")
-            if (hasAccess) {
-                var id = request.params.id;
-                database.delete("users", {"_id": id}, function(data){
-                    var return_object = {
-                        count: data.length,
-                        users: data
-                    }
-                    reply(return_object).code(200);
-                });
-            }
-            else {
-                var return_object = {
-                    code: 401,
-                    message: "No access"
-                }
-                reply(return_object).code(401);
-            }
-        }
-    });
-*/
    
 
     server.route({

@@ -1,38 +1,102 @@
+'use strict'
+
 var Hapi = require('hapi');
 var database = require('./database.js');
 var passwordHash = require('password-hash');
 
 var server = new Hapi.Server();
-server.connection({ 
-    host: 'localhost', 
-    port: 8000
+server.connection({ port: 8000 });
+
+/*
+server.state('data', {
+    ttl: null,
+    isSecure: true,
+    isHttpOnly: true,
+    encoding: 'base64json',
+    clearInvalid: false, // remove invalid cookies
+    strictHeader: true // don't allow violations of RFC 6265
+});
+*/
+
+server.state('session', {
+    ttl: 24 * 60 * 60 * 1000,     // One day
+    isSecure: false,
+    strictHeader: false,
 });
 
-var hasAccess = true;
-
 server.prepareRoutes = function() {
+    server.route({
+        method: "POST",
+        path: "/login",
+        config: {
+            state: {
+                parse: 'false',
+                failAction: 'log'
+            },
+            handler: function(request, reply) {
+                console.log("POST /login")
+                var name = request.payload.username;
+                var pass = request.payload.password;
+                if (name === undefined || pass === undefined) {
+                    var return_object = { 
+                        "code": 403, 
+                        "message": "Missing username or password" 
+                    }
+                    reply(return_object).code(return_object.code);
+                }
+                else {
+                    database.get("users", {username: name}, {}, function(data){
+                        var return_object = {};
+                        if (data[0] !== undefined) {
+                            if (passwordHash.verify(pass, data[0].password)) {
+                                return_object = { 
+                                    code: 200, 
+                                    message: "Login successful" 
+                                }
+                                var sessionId = Math.random().toString();
+                                database.post("sessions", {"username": name, "sessionId": sessionId}, function(data) {
+                                    reply(return_object).code(return_object.code).state("session", sessionId);
+                                })
+                            }
+                            else {
+                                return_object = { 
+                                    code: 400, 
+                                    message: "Wrong password" 
+                                }
+                                reply(return_object).code(return_object.code);
+                            }
+                        }
+                        else {
+                            return_object = { "code": 400, "message": "User doesn't exist" }
+                            reply(return_object).code(return_object.code);
+                        }
+                    });
+                }
+            } 
+        }
+    });
+
+    server.route({
+        method: "POST",
+        path: "/logout",
+        config: {
+            handler: function(request, reply) {
+                reply({
+                    code: 200,
+                    message: "Logged out successfully"
+                }).code(200)
+            }
+        }
+    })
 
     server.route({
         method: "GET",
         path: "/users/{id?}",
-        handler: function(request, reply) {
-            console.log("GET /users/{id?}")
-            if (request.params.id && hasAccess) {
-                var id = request.params.id;
-                database.get("users", {"_id": id}, function(data){
-                    if (data.length > 0) 
-                        reply(data[0]).code(200);
-                    else {
-                        var return_object = {
-                            code: 404,
-                            message: "User not found"
-                        }
-                        reply(return_object).code(404);
-                    }
-                }); 
-            }
-            else {
-                database.get("users", {}, function(data){
+        config: {
+            handler: function(request, reply) {
+                console.log(request.state)
+                console.log("GET /users")
+                database.get("users", {}, {username: 1}, function(data){
                     var return_object = {
                         count: data.length,
                         users: data
@@ -48,32 +112,33 @@ server.prepareRoutes = function() {
         path: "/users",
         handler: function(request, reply) {
             console.log("POST /users")
-            var name = request.payload.name;
+            var name = request.payload.username;
             var pass = request.payload.password;
             if (name === undefined || pass === undefined) {
                 var return_object = {
                     "code": 403,
                     "message": "Missing username or password"
                 }
-                reply(return_object).code(403);
+                reply(return_object).code(return_object.code);
             }
             else {
                 var password = passwordHash.generate(pass);
-                database.get("users", {"name": name}, function(data){
-                    if (data[0] != undefined) {
-                        var return_object = {
-                            "code": 409,
-                            "message": "User with given username already exists"
+                var return_object = {};
+                database.get("users", {"username": name}, {}, function(data){
+                    if (data[0] !== undefined) {
+                        return_object = { 
+                            code: 409, 
+                            "message": "User with given username already exists" 
                         }
-                        reply(return_object).code(409);
+                        reply(return_object).code(return_object.code);
                     }
                     else {
-                        database.post("users", {"name": name, "password": password}, function(data){
-                            var return_object = {
-                                count: data.length,
-                                users: data
+                        database.post("users", {"username": name, "password": password}, function(data){
+                            return_object = { 
+                                code: 201,
+                                message: "New user created"
                             }
-                            reply(return_object).code(201);
+                            reply(return_object).code(return_object.code);
                         });
                     }
                 })
@@ -81,6 +146,7 @@ server.prepareRoutes = function() {
         }
     });
 
+    /*
     server.route({
         method: "DELETE",
         path: "/users/{id}",
@@ -105,52 +171,8 @@ server.prepareRoutes = function() {
             }
         }
     });
-
-    server.route({
-        method: "POST",
-        path: "/login",
-        handler: function(request, reply) {
-            console.log("POST /login")
-            var name = request.payload.name;
-            var pass = request.payload.password;
-            if (name === undefined || pass === undefined) {
-                var return_object = {
-                    "code": 403,
-                    "message": "Missing username or password"
-                }
-                reply(return_object).code(403);
-            }
-            else {
-                database.get("users", {"name": name}, function(data){
-                    if (data[0] !== undefined) {
-                        var stored_password = data[0].password;
-                        var valid_credentials = passwordHash.verify(pass, stored_password);
-                        if (valid_credentials){
-                            var return_object = {
-                                "code": 200,
-                                "message": "Login successful"
-                            }
-                            reply(return_object).code(200);
-                        }
-                        else {
-                            var return_object = {
-                                "code": 400,
-                                "message": "Wrong password"
-                            }
-                            reply(return_object).code(400) 
-                        }
-                    }
-                    else {
-                        var return_object = {
-                            "code": 400,
-                            "message": "User doesn't exist"
-                        }
-                        reply(return_object).code(400);
-                    }
-                });
-            }
-        }
-    });
+*/
+   
 
     server.route({
         method: "POST",
@@ -158,7 +180,7 @@ server.prepareRoutes = function() {
         handler: function(request, reply) {
             console.log("POST /movies")
             if (hasAccess) {
-                var name = request.payload.name;
+                var name = request.payload.username;
                 var year = request.payload.year;
                 if (name === undefined || year === undefined) {
                     var return_object = {
@@ -168,7 +190,7 @@ server.prepareRoutes = function() {
                     reply(return_object).code(403);
                 }
                 else {
-                    database.post("movies", {"name": name, "year": year}, function(data){
+                    database.post("movies", {"username": name, "year": year}, function(data){
                         var return_object = {
                             count: data.length,
                             users: data
@@ -187,14 +209,14 @@ server.prepareRoutes = function() {
             console.log("PUT /movies/{id}")
             if (hasAccess) {
                 var id = request.params.id;
-                var name = request.payload.name;
+                var name = request.payload.username;
                 var year = request.payload.year;
                 
                 var query = {};
                 var good_request = false;
 
                 if (name !== undefined && year === undefined) {
-                    query = {"name": name};
+                    query = {"username": name};
                     good_request = true;
                 }
                 else if (name === undefined && year !== undefined) {
@@ -202,7 +224,7 @@ server.prepareRoutes = function() {
                     good_request = true;
                 }
                 else if (name !== undefined && year !== undefined) {
-                    query = {"name": name, "year": year};
+                    query = {"username": name, "year": year};
                     good_request = true;
                 }
                 if (good_request) {

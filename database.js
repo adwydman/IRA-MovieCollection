@@ -29,7 +29,7 @@ var insertDocuments = function(db, query, collection_name, callback) {
     })
 }
 
-var findDocuments = function(db, query, collection_name, callback) {
+var findDocuments = function(db, query, options, collection_name, callback) {
     var collection = db.collection(collection_name);
     if (query["_id"] !== undefined){
         try {
@@ -38,7 +38,7 @@ var findDocuments = function(db, query, collection_name, callback) {
         catch (e) {}
     }
     
-    collection.find(query).toArray(function(err, data) {
+    collection.find(query, options).toArray(function(err, data) {
         callback(data);
     });      
 }
@@ -57,18 +57,16 @@ var url = 'mongodb://localhost:27017/projekt_rest';
 // Use connect method to connect to the Server
 database.post = function (collection, query, callback) {
     MongoClient.connect(url, function(err, db) {
-        insertDocuments(db, query, collection, function() {
-            findDocuments(db, {}, collection, function(data) {
-                callback(data);
-                db.close();    
-            });
+        insertDocuments(db, query, collection, function(result) {
+            callback(result);
+            db.close();    
         })
     });
 }
 
-database.get = function (collection, query, callback) {
+database.get = function (collection, query, options, callback) {
     MongoClient.connect(url, function(err, db) {
-        findDocuments(db, query, collection, function(data) {
+        findDocuments(db, query, options, collection, function(data) {
             callback(data);
             db.close();    
         });
@@ -94,27 +92,6 @@ database.delete = function (collection, query, callback) {
                 callback(data);
                 db.close();
             })
-        });
-    });
-}
-
-database.removeCurrentTask = function(task, callback) {
-    MongoClient.connect(url, function(err, db) {
-        removeDocument(db, task, "current_tasks", function() {
-            db.close();
-        });
-    });
-}
-
-database.taskDone = function(task_id, callback) {
-    MongoClient.connect(url, function(err, db) {
-        findDocument(db, task_id, "current_tasks", function(result) {
-            var found_task_name = result[0].task_name;
-            removeDocument(db, task_id, "current_tasks", function() {
-                insertDocuments(db, found_task_name, "done_tasks", function() {
-                   db.close();
-                });
-            });
         });
     });
 }

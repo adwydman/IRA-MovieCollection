@@ -38,13 +38,14 @@ server.prepareRoutes = function() {
                         database.get("users", {username: name}, {}, function(data){
                             var return_object = {};
                             if (data[0] !== undefined) {
+                                console.log(data[0])
                                 if (passwordHash.verify(pass, data[0].password)) {
                                     return_object = { 
                                         code: 200, 
                                         message: "Login successful" 
                                     }
                                     var sessionId = Math.random().toString();
-                                    database.post("sessions", {"username": name, "sessionId": sessionId}, function(data) {
+                                    database.post("sessions", {"user_id": data[0]["_id"], "username": user, "sessionId": sessionId}, function(data) {
                                         reply(return_object).code(return_object.code).state('session', sessionId);
                                     })
                                 }
@@ -79,6 +80,26 @@ server.prepareRoutes = function() {
                 }
                 else 
                     reply().redirect("/movies").code(302);
+            }
+        }
+    });
+
+    server.route({
+        method: "POST",
+        path: "/me/{movie_id}",
+        handler: function(request,reply){
+            console.log("POST /me/{movie_id}");
+            if (request.state.session) {
+                var sessionId = request.state.session;
+                database.get("sessions", {"sessionId": sessionId}, {}, function(data) {
+                    var userDetails = data[0];
+                    console.log(userDetails)
+
+
+                });
+            }
+            else {
+                reply.redirect("/movies").code(302);
             }
         }
     })
@@ -204,7 +225,7 @@ server.prepareRoutes = function() {
         handler: function(request, reply) {
             console.log("POST /movies")
             if (hasAccess) {
-                var name = request.payload.username;
+                var name = request.payload.movieName;
                 var year = request.payload.year;
                 var return_object = {};
                 if (name === undefined || year === undefined) {
@@ -212,7 +233,7 @@ server.prepareRoutes = function() {
                     reply(return_object).code(return_object.code);
                 }
                 else {
-                    database.post("movies", {"username": name, "year": year}, function(data){
+                    database.post("movies", {"movie_name": name, "year": year}, function(data){
                         return_object = { code: 200, count: data.length, users: data }
                         reply(return_object).code(return_object.code);
                     });

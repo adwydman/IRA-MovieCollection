@@ -53,7 +53,7 @@ var findDocuments = function(db, query, options, collection_name, callback) {
             result.type = "success";
         }
 
-        callback(data);
+        callback(result);
     });      
 }
 

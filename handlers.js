@@ -2,25 +2,26 @@ var database = require('./database.js');
 var passwordHash = require('password-hash');
 
 var handlers = {
-	login: function(request, reply) {
-		console.log("POST /login")
+    login: function(request, reply) {
+		console.log("POST /login");
         if (request.state.session) 
-            reply().redirect("/movies").code(302)
+            reply().redirect("/movies").code(302);
+
         else {
             var name = request.payload.username;
             var pass = request.payload.password;
             if (name === undefined || pass === undefined) {
                 var return_object = { 
-                    "code": 403, 
-                    "message": "Missing username or password" 
-                }
+                    code: 403, 
+                    message: "Missing username or password" 
+                };
                 reply(return_object).code(return_object.code);
             }
+
             else {
                 database.get("users", {username: name}, {}, function(data){
                     var return_object = {};
                     if (data[0] !== undefined) {
-                        console.log(data[0])
                         if (passwordHash.verify(pass, data[0].password)) {
                             return_object = { 
                                 code: 200, 
@@ -31,6 +32,7 @@ var handlers = {
                                 reply(return_object).code(return_object.code).state('session', session_id);
                             })
                         }
+
                         else {
                             return_object = { 
                                 code: 400, 
@@ -39,6 +41,7 @@ var handlers = {
                             reply(return_object).code(return_object.code);
                         }
                     }
+
                     else {
                         return_object = { "code": 400, "message": "User doesn't exist" }
                         reply(return_object).code(return_object.code);
@@ -158,19 +161,22 @@ var handlers = {
         }
     },
 
-	postMeMovies: function(request,reply){
+	postMeMovies: function(request, reply){
         console.log("POST /me/{movie_id}");
         if (request.state.session) {
             var session_id = request.state.session;
             var movie_id = request.params.movie_id;
             database.get("sessions", {"session_id": session_id}, {}, function(data) {
                 var user_details = data[0];
-                database.post("users_and_movies", {"user_id": user_details.user_id, "movie_id": movie_id}, function(result) {
-                	var return_object = {
-                		code: 201,
-                		message: "Movie linked to the user"
-                	}
-                	reply(return_object).code(return_object.code);
+                database.get("movies", {"_id": movie_id}, {}, function(result_movies) {
+                    var movie_name = result_movies[0].movie_name;
+                    database.post("users_and_movies", {"username": user_details.username, "movie_name": movie_name}, function(result) {
+                    	var return_object = {
+                    		code: 201,
+                    		message: "Movie linked to the user"
+                    	}
+                    	reply(return_object).code(return_object.code);
+                    })
                 })
             });
         }
@@ -178,23 +184,88 @@ var handlers = {
             reply.redirect("/movies").code(302);
         }
     },
+    
+    getMe: function(request, reply) {
+        console.log("GET /me");
+        if (request.state.session) {
+            var session_id = request.state.session;
+            database.get("sessions", {"session_id": session_id}, {}, function(data) {
+                var user_details = data[0];
+                database.get("users_and_movies", {"username": user_details.username}, {"_id": 0, "username": 0}, function(result) {
+                    var return_object = {
+                        code: 200,
+                        username: user_details.username,
+                        count: result.length,
+                        movies: result
+                    }
+                    reply(return_object).code(return_object.code);
+                })
+            })
+        }
+    },
+
+    getMovies: function(request, reply) {
+        console.log("GET /movies/{id?}")
+        if (request.params.id) {
+            var id = request.params.id;
+            database.get("movies", {"_id": id}, {}, function(data){
+                if (data.length > 0)
+                    reply(data[0]).code(200);
+                else {
+                    var return_object = {
+                        code: 404,
+                        message: "Movie not found"
+                    }
+                    reply(return_object).code(return_object.code);
+                }
+            }); 
+        }
+        else {
+            database.get("movies", {}, {}, function(data){
+                var return_object = {
+                    code: 200,
+                    count: data.length,
+                    movies: data
+                }
+                reply(return_object).code(return_object.code);
+            });
+        }
+    },
 
     postMovies: function(request, reply) {
-        console.log("POST /movies")
-        if (hasAccess) {
-            var name = request.payload.movieName;
-            var year = request.payload.year;
-            var return_object = {};
-            if (name === undefined || year === undefined) {
-                return_object = { code: 403, message: "Missing name of year" }
-                reply(return_object).code(return_object.code);
-            }
-            else {
-                database.post("movies", {"movie_name": name, "year": year}, function(data){
-                    return_object = { code: 200, count: data.length, users: data }
-                    reply(return_object).code(return_object.code);
-                });
-            }
+        console.log("POST /movies");
+        if (request.state.session) {
+            var session_id = request.state.session;
+            database.get("sessions", {"session_id": session_id}, {}, function(data) {
+                var user_details = data[0];
+                if (user_details.username === "admin") {
+                    var name = request.payload.movieName;
+                    var year = request.payload.year;
+                    var return_object = {};
+                    if (name === undefined || year === undefined) {
+                        return_object = { 
+                            code: 403, 
+                            message: "Missing name of year" 
+                        }
+                        reply(return_object).code(return_object.code);
+                    }
+                    else {
+                        database.post("movies", {"movie_name": name, "year": year}, function(data){
+                            return_object = { 
+                                code: 201, 
+                                message: "Movie has been successfully added"
+                            }
+                            reply(return_object).code(return_object.code);
+                        });
+                    }
+                }
+                else {
+                    // if not admin
+                }
+            })
+        }
+        else {
+            // if no session
         }
     },
 
@@ -280,33 +351,7 @@ var handlers = {
         }
     },
 
-    getMovies: function(request, reply) {
-        console.log("GET /movies/{id?}")
-        if (request.params.id) {
-            var id = request.params.id;
-            database.get("movies", {"_id": id}, {}, function(data){
-                if (data.length > 0)
-                    reply(data[0]).code(200);
-                else {
-                    var return_object = {
-                        code: 404,
-                        message: "movie not found"
-                    }
-                    reply(return_object).code(return_object.code);
-                }
-            }); 
-        }
-        else {
-            database.get("movies", {}, {}, function(data){
-                var return_object = {
-                    code: 200,
-                    count: data.length,
-                    movies: data
-                }
-                reply(return_object).code(return_object.code);
-            });
-        }
-    }
+    
 
 }
 

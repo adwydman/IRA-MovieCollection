@@ -8,6 +8,7 @@ server.state('session', {
     ttl: 15 * 60 * 1000,  // 15 minutes
     isSecure: false,
     strictHeader: false,
+    password: "hard_password"
 });
 
 server.prepareRoutes = function() {
@@ -52,6 +53,12 @@ server.prepareRoutes = function() {
         method: "POST",
         path: "/me/{movie_id}",
         handler: handlers.postMeMovies
+    })
+
+    server.route({
+        method: "GET",
+        path: "/me",
+        handler: handlers.getMe
     })
 
     server.route({

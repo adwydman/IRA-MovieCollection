@@ -1,6 +1,11 @@
 var database = require('./database.js');
 var passwordHash = require('password-hash');
 
+var getSessionUser = function(session_id, callback) {
+
+}
+
+
 var handlers = {
     login: function(request, reply) {
 		console.log("POST /login");
@@ -55,7 +60,10 @@ var handlers = {
 		console.log("POST /logout")
 		var return_object = {};
         if (request.state.session) {
-            return_object = { code: 200, message: "Logged out successfully" }
+            return_object = { 
+                code: 200, 
+                message: "Logged out successfully" 
+            }
             reply(return_object).code(return_object.code).unstate('session');
         }
         else 
@@ -260,12 +268,12 @@ var handlers = {
                     }
                 }
                 else {
-                    // if not admin
+                    // todo: not admin
                 }
             })
         }
         else {
-            // if no session
+            // todo: no session
         }
     },
 
@@ -297,14 +305,24 @@ var handlers = {
 		                good_request = true;
 		            }
 		            if (good_request) {
-		                database.put("movies", id, query, function(data) {
-		                    var return_object = {
-		                    	code: 200,
-		                        count: data.length,
-		                        movies: data
-		                    }
-		                    reply(return_object).code(return_object.code);
-		                })
+                        database.get("movies", {"_id": movie_id}, {}, function(result) {
+                            if (result.length !== 0) {
+        		                database.put("movies", id, query, function() {
+        		                    var return_object = {
+        		                    	code: 200,
+        		                        message: "Movie has been updated"
+        		                    }
+        		                    reply(return_object).code(return_object.code);
+        		                });
+                            }
+                            else {
+                                var return_object = {
+                                    code: 404, 
+                                    message: "Movie was not found"
+                                }
+                                reply(return_object).code(return_object.code);
+                            }
+                        })
 		            }
 		            else {
 		                var return_object = {
@@ -315,7 +333,7 @@ var handlers = {
 		            }
         		}
         		else {
-        			// todo: what is user is not the admin
+        			// todo: not admin
         		}
         	})
         }
@@ -334,10 +352,10 @@ var handlers = {
 		            var id = request.params.id;
 		            database.delete("movies", {"_id": id}, function(){
 		                var return_object = {
-		                    count: data.length,
-		                    users: data
+                            code: 200,
+		                    message: "Movie has been deleted"
 		                }
-		                reply(return_object).code(200);
+		                reply(return_object).code(return_object.code);
 		            });
         		}
         	}) 
@@ -347,7 +365,7 @@ var handlers = {
                 code: 401,
                 message: "No access"
             }
-            reply(return_object).code(401);
+            reply(return_object).code(return_object.code);
         }
     },
 

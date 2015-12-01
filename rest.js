@@ -3,7 +3,7 @@ var Joi = require('joi');
 var handlers = require('./handlers.js');
 
 var server = new Hapi.Server();
-server.connection({ port: 8000 });
+server.connection({ port: 80 });
 
 server.state('session', {
     ttl: 15 * 60 * 1000,  // 15 minutes

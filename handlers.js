@@ -205,7 +205,7 @@ var handlers = {
                     var return_object = {
                         code: 200,
                         username: user_details.username,
-                        count: result.length,
+                        movies_count: result.length,
                         movies: result
                     }
                     reply(return_object).code(return_object.code);

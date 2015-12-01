@@ -52,18 +52,29 @@ server.prepareRoutes = function() {
     server.route({
         // Add listing movies of a specific user
         method: "GET",
-        path: "/users/{id?}",
+        path: "/users/{id}",
         config: {
-            handler: handlers.getUsers,
-            description: 'Gets all users or a specific user',
-            notes: 'Restricted only from admin',
+            handler: handlers.getSpecificUser,
+            description: 'Gets a specific user',
             tags: ['api'],
             validate: {
                 params: {
                     id: Joi.string()
-                        .description('Optional id of a user')
+                        .required()
+                        .description('Id of a user')
                 }
             }
+        }
+    });
+
+    server.route({
+        // Add listing movies of a specific user
+        method: "GET",
+        path: "/users",
+        config: {
+            handler: handlers.getUsers,
+            description: 'Gets all users',
+            tags: ['api'],
         }
     });
 
@@ -90,7 +101,7 @@ server.prepareRoutes = function() {
     
     server.route({
         method: "DELETE",
-        path: "/users/{id}",
+        path: "/users/{user_id}",
         config: {
             handler: handlers.deleteUsers,
             description: "Deletes a user",
@@ -98,7 +109,7 @@ server.prepareRoutes = function() {
             tags: ['api'],
             validate: {
                 params: {
-                    id: Joi.string()
+                    user_id: Joi.string()
                         .required()
                         .description("Id of a user")
                 }
@@ -113,8 +124,26 @@ server.prepareRoutes = function() {
         path: "/me/{movie_id}",
         config: {
             handler: handlers.postMeMovies,
-            description: "User add a new movie to his collection",
-            notes: "If not logged in, redirects to /movies",
+            description: "User adds a new movie to his collection",
+            notes: "User must be logged in",
+            tags: ['api'],
+            validate: {
+                params: {
+                    movie_id: Joi.string()
+                              .required()
+                              .description("Id of a movie")
+                }
+            }
+        }
+    })
+
+    server.route({
+        method: "DELETE",
+        path: "/me/{movie_id}",
+        config: {
+            handler: handlers.deleteMeMovies,
+            description: "User deletes a movie from his collection",
+            notes: "User must be logged in",
             tags: ['api'],
             validate: {
                 params: {
@@ -202,17 +231,28 @@ server.prepareRoutes = function() {
 
     server.route({
         method: "GET",
-        path: "/movies/{id?}",
+        path: "/movies/{id}",
         config: {
-            handler: handlers.getMovies,
-            description: "Gets all movies or details about a movie",
+            handler: handlers.getSpecificMovie,
+            description: "Gets details about a movie",
             tags: ['api'],
             validate: {
                 params: {
-                    id: Joi.number()
+                    id: Joi.string()
+                        .required()
                         .description("Id of a movie")
                 }
             }     
+        }
+    });
+
+    server.route({
+        method: "GET",
+        path: "/movies",
+        config: {
+            handler: handlers.getMovies,
+            description: "Gets all movies",
+            tags: ['api'],
         }
     });
 }

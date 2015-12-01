@@ -1,18 +1,26 @@
 var database = require('./database.js');
 var passwordHash = require('password-hash');
 
-var getSessionUser = function(session_id, callback) {
-
+var movieExists = function(array, movie_id) {
+    for (var i = 0; i < array.length; i++) {
+        if (array[i].movie_id === movie_id)
+            return true;
+    }
+    return false;
 }
+
 
 var handlers = {
     login: function(request, reply) {
 		console.log("POST /login");
-        if (request.state.session) 
-            reply().redirect("/movies").code(302);
-
+        if (request.state.session) {
+            var return_object = {
+                code: 200,
+                message: "You are logged in"
+            }
+            reply(return_object).code(return_object.code);
+        }
         else {
-            console.log(request.payload)
             if (request.payload === null || request.payload.username === undefined || request.payload.password === undefined) {
                 var return_object = { 
                     code: 403, 
@@ -58,54 +66,41 @@ var handlers = {
 
 	logout: function(request, reply) {
 		console.log("POST /logout")
-		var return_object = {};
-        if (request.state.session) {
-            return_object = { 
-                code: 200, 
-                message: "Logged out successfully" 
-            }
-            reply(return_object).code(return_object.code).unstate('session');
+		var return_object = { 
+            code: 200, 
+            message: "Logged out successfully" 
         }
-        else 
-            reply().redirect("/movies").code(302);
+        reply(return_object).code(return_object.code).unstate('session');
 	},
 
+    getSpecificUser: function(request, reply) {
+        console.log("GET /users/{id}");
+        var user_id = request.params.id;
+        database.get("users", {"_id": user_id}, {password: 0}, function(data) {
+            var user_details = data[0];
+            database.get("users_and_movies", {"username": user_details.username}, {"_id": 0, "username": 0}, function(result) {
+                var return_object = {
+                    code: 200,
+                    user_id: user_id,
+                    username: user_details.username,
+                    movies_count: result.length,
+                    movies: result
+                }
+                reply(return_object).code(return_object.code);
+            });
+        });
+    },
 
     getUsers: function(request, reply) {
-        // add only for one user
-        console.log("GET /users/{id?}")
-        if (request.state.session) {
-            var session_id = request.state.session;
-
-            database.get("sessions", {"session_id": session_id}, {}, function(data) {
-                var user_details = data[0];
-                var query = {};
-                if (user_details.username === "admin") {
-                    if (request.params.id) {
-                        query = { "_id": request.params.id };
-                    }
-                    database.get("users", query, {}, function(data){
-                        var return_object = {
-                            code: 200,
-                            count: data.length,
-                            users: data
-                        }
-                        reply(return_object).code(return_object.code);
-                    });  
-                }
-                else {
-                    var return_object = {
-                        code: 401,
-                        message: "You don't have the permission to see this page"
-                    }
-                    reply(return_object).code(return_object.code);
-                }                            
-            })
-        }
-        else {
-            //http://stackoverflow.com/questions/2839585/what-is-correct-http-status-code-when-redirecting-to-a-login-page
-            reply().redirect("/movies").code(302);
-        }
+        console.log("GET /users")
+        database.get("users", {}, {password: 0}, function(data){
+            var return_object = {
+                code: 200,
+                count: data.length,
+                users: data
+            }
+            reply(return_object).code(return_object.code);
+        });  
     },
 
     postUsers: function(request, reply) {
@@ -144,30 +139,48 @@ var handlers = {
     },
 
     deleteUsers: function(request, reply) {
-        console.log("DELETE /users/{id}")
-        var redirect = false;
+        console.log("DELETE /users/{user_id}")
         if (request.state.session) {
+            var user_id = request.params.user_id;
             var session_id = request.state.session;
-
             database.get("sessions", {"session_id": session_id}, {}, function(data) {
                 var user_details = data[0];
                 if (user_details.username === "admin") {
-                    var id = request.params.id;
-
-                    database.delete("users", {"_id": id}, function(){
-                        reply(return_object).code(200);
+                    database.get("users", {"_id": user_id}, {}, function(result) {
+                        if (result.length === 0) {
+                            var return_object = {
+                                code: 404, 
+                                message: "User not found"
+                            }
+                            reply(return_object).code(return_object.code);
+                        }
+                        else {
+                            database.delete("users", {"_id": user_id}, function(deletion){
+                                var return_object = {
+                                    code: 200,
+                                    message: "User has been deleted"
+                                }
+                                reply(return_object).code(return_object.code);
+                            });
+                        }
                     });
-
                 }
-                else 
-                    redirect = true;
+                else {
+                    var return_object = {
+                        code: 403,
+                        message: "No access"
+                    }
+                    reply(return_object).code(return_object.code)
+                } 
             })
         }
-        else 
-            redirect = true;
-        
-        if (redirect) 
-            reply().redirect("/movies").code(302);
+        else {
+            var return_object = {
+                code: 403,
+                message: "You are not logged in"
+            }
+            reply(return_object).code(return_object.code)
+        }
     },
 
 
@@ -179,19 +192,70 @@ var handlers = {
             database.get("sessions", {"session_id": session_id}, {}, function(data) {
                 var user_details = data[0];
                 database.get("movies", {"_id": movie_id}, {}, function(result_movies) {
-                    var movie_name = result_movies[0].movie_name;
-                    database.post("users_and_movies", {"username": user_details.username, "movie_name": movie_name}, function(result) {
-                    	var return_object = {
-                    		code: 201,
-                    		message: "Movie linked to the user"
-                    	}
-                    	reply(return_object).code(return_object.code);
+                    var movie_name = result_movies[0].name;
+                    database.get("users_and_movies", {"username": user_details.username, "movie_id": movie_id, "movie_name": movie_name}, {}, function(data) {
+                        if (data.length !== 0) {
+                            var return_object = {
+                                code: 409, // conflict
+                                message: "This movie has already been assigned"
+                            }
+                            reply(return_object).code(return_object.code);
+                        }
+                        else {
+                            database.post("users_and_movies", {"username": user_details.username, "movie_id": movie_id, "movie_name": movie_name}, function(result) {
+                            	var return_object = {
+                            		code: 201,
+                            		message: "Movie has been linked to the user"
+                            	}
+                            	reply(return_object).code(return_object.code);
+                            })
+                        }
                     })
                 })
             });
         }
         else {
-            reply.redirect("/movies").code(302);
+            var return_object = {
+                code: 403,
+                message: "You are not logged in"
+            }
+            reply(return_object).code(return_object.code);
+        }
+    },
+
+    deleteMeMovies: function(request, reply) {
+        console.log("/DELETE /me/{movie_id}");
+        var movie_id = request.params.movie_id;
+        if (request.state.session) {
+            var session_id = request.state.session;
+            database.get("sessions", {"session_id": session_id}, {}, function(data) {
+                var user_details = data[0];
+                database.get("users_and_movies", {"username": user_details.username}, {"_id": 0, "username": 0}, function(result) {
+                    if (movieExists(result, movie_id)) {
+                        database.delete("users_and_movies", {"username": user_details.username, movie_id: movie_id}, function(deletion) {
+                            var return_object = {
+                                code: 200, 
+                                message: "Movie has been successfully deleted"
+                            }
+                            reply(return_object).code(return_object.code);
+                        })
+                    }
+                    else {
+                        var return_object = {
+                            code: 404,
+                            message: "Movie not found"
+                        }
+                        reply(return_object).code(return_object.code);
+                    }
+                });
+            });
+        }
+        else {
+            var return_object = {
+                code: 403,
+                message: "You are not logged in"
+            }
+            reply(return_object).code(return_object.code);  
         }
     },
     
@@ -204,6 +268,7 @@ var handlers = {
                 database.get("users_and_movies", {"username": user_details.username}, {"_id": 0, "username": 0}, function(result) {
                     var return_object = {
                         code: 200,
+                        user_id: user_details.user_id,
                         username: user_details.username,
                         movies_count: result.length,
                         movies: result
@@ -213,36 +278,45 @@ var handlers = {
             })
         }
         else {
-            // todo: no session
+            var return_object = {
+                code: 403,
+                message: "You are not logged in"
+            }
+            reply(return_object).code(return_object.code);
         }
     },
 
-    getMovies: function(request, reply) {
-        console.log("GET /movies/{id?}")
-        if (request.params.id) {
-            var id = request.params.id;
-            database.get("movies", {"_id": id}, {}, function(data){
-                if (data.length > 0)
-                    reply(data[0]).code(200);
-                else {
-                    var return_object = {
-                        code: 404,
-                        message: "Movie not found"
-                    }
-                    reply(return_object).code(return_object.code);
-                }
-            }); 
-        }
-        else {
-            database.get("movies", {}, {}, function(data){
+    getSpecificMovie: function(request, reply) {
+        console.log("GET /movies/{id}")
+        var id = request.params.id;
+        database.get("movies", {"_id": id}, {}, function(data){
+            if (data.length > 0) {
                 var return_object = {
                     code: 200,
-                    count: data.length,
-                    movies: data
+                    data: data[0]
                 }
                 reply(return_object).code(return_object.code);
-            });
-        }
+            }
+            else {
+                var return_object = {
+                    code: 404,
+                    message: "Movie not found"
+                }
+                reply(return_object).code(return_object.code);
+            }
+        }); 
+    },
+
+    getMovies: function(request, reply) {
+        console.log("GET /movies")
+        database.get("movies", {}, {}, function(data){
+            var return_object = {
+                code: 200,
+                movies_count: data.length,
+                movies: data
+            }
+            reply(return_object).code(return_object.code);
+        });
     },
 
     postMovies: function(request, reply) {
@@ -368,8 +442,8 @@ var handlers = {
         }
         else {
             var return_object = {
-                code: 401,
-                message: "No access"
+                code: 403,
+                message: "You are not logged in"
             }
             reply(return_object).code(return_object.code);
         }

@@ -7,6 +7,7 @@ var removeDocument = function(db, query, collection_name, callback) {
     var collection = db.collection(collection_name);
     if (query["_id"] !== undefined) 
         query["_id"] = new mongo.ObjectID(query["_id"]);
+
     collection.remove(query, function(err, result) {
         if(err){
             result = err;

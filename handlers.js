@@ -5,7 +5,6 @@ var getSessionUser = function(session_id, callback) {
 
 }
 
-
 var handlers = {
     login: function(request, reply) {
 		console.log("POST /login");
@@ -13,9 +12,8 @@ var handlers = {
             reply().redirect("/movies").code(302);
 
         else {
-            var name = request.payload.username;
-            var pass = request.payload.password;
-            if (name === undefined || pass === undefined) {
+            console.log(request.payload)
+            if (request.payload === null || request.payload.username === undefined || request.payload.password === undefined) {
                 var return_object = { 
                     code: 403, 
                     message: "Missing username or password" 
@@ -24,6 +22,8 @@ var handlers = {
             }
 
             else {
+                var name = request.payload.username;
+                var pass = request.payload.password;
                 database.get("users", {username: name}, {}, function(data){
                     var return_object = {};
                     if (data[0] !== undefined) {

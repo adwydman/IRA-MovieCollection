@@ -16,11 +16,21 @@ server.prepareRoutes = function() {
         method: "POST",
         path: "/login",
         config: {
+            handler: handlers.login,
             state: {
                 parse: 'true',
                 failAction: 'log'
             },
-            handler: handlers.login
+            description: 'Logs the user in',
+            notes: 'If user is already logged in, redirects to /movies',
+            tags: ['api'],
+            validate: {
+                params: {
+                    username: Joi.number()
+                            .required()
+                            .description('the id for the todo item'),
+                }
+            }
         }
     });
 

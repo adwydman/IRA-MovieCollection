@@ -72,7 +72,8 @@ var handlers = {
 
 
     getUsers: function(request, reply) {
-        console.log("GET /users")
+        // add only for one user
+        console.log("GET /users/{id?}")
         if (request.state.session) {
             var session_id = request.state.session;
 
@@ -105,33 +106,6 @@ var handlers = {
             //http://stackoverflow.com/questions/2839585/what-is-correct-http-status-code-when-redirecting-to-a-login-page
             reply().redirect("/movies").code(302);
         }
-    },
-
-    deleteUsers: function(request, reply) {
-        console.log("DELETE /users/{id}")
-        var redirect = false;
-        if (request.state.session) {
-            var session_id = request.state.session;
-
-            database.get("sessions", {"session_id": session_id}, {}, function(data) {
-                var user_details = data[0];
-                if (user_details.username === "admin") {
-                    var id = request.params.id;
-
-                    database.delete("users", {"_id": id}, function(){
-                        reply(return_object).code(200);
-                    });
-
-                }
-                else 
-                    redirect = true;
-            })
-        }
-        else 
-            redirect = true;
-        
-        if (redirect) 
-            reply().redirect("/movies").code(302);
     },
 
     postUsers: function(request, reply) {
@@ -168,6 +142,34 @@ var handlers = {
             })
         }
     },
+
+    deleteUsers: function(request, reply) {
+        console.log("DELETE /users/{id}")
+        var redirect = false;
+        if (request.state.session) {
+            var session_id = request.state.session;
+
+            database.get("sessions", {"session_id": session_id}, {}, function(data) {
+                var user_details = data[0];
+                if (user_details.username === "admin") {
+                    var id = request.params.id;
+
+                    database.delete("users", {"_id": id}, function(){
+                        reply(return_object).code(200);
+                    });
+
+                }
+                else 
+                    redirect = true;
+            })
+        }
+        else 
+            redirect = true;
+        
+        if (redirect) 
+            reply().redirect("/movies").code(302);
+    },
+
 
 	postMeMovies: function(request, reply){
         console.log("POST /me/{movie_id}");
@@ -210,6 +212,9 @@ var handlers = {
                 })
             })
         }
+        else {
+            // todo: no session
+        }
     },
 
     getMovies: function(request, reply) {
@@ -242,6 +247,7 @@ var handlers = {
 
     postMovies: function(request, reply) {
         console.log("POST /movies");
+        // todo: dodać walidację payloadu
         if (request.state.session) {
             var session_id = request.state.session;
             database.get("sessions", {"session_id": session_id}, {}, function(data) {

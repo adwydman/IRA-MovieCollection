@@ -1,4 +1,5 @@
 var Hapi = require('hapi');
+var addCorsHeaders = require('hapi-cors-headers');
 var Joi = require('joi');
 var handlers = require('./handlers.js');
 
@@ -256,5 +257,7 @@ server.prepareRoutes = function() {
         }
     });
 }
+
+server.ext('onPreResponse', addCorsHeaders)
 
 module.exports = server;

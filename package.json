@@ -11,6 +11,7 @@
   "dependencies": {
     "hapi": "^10.4.0",
     "hapi-auth-cookie": "^3.1.0",
+    "hapi-cors-headers": "^1.0.0",
     "hapi-swagger": "^2.2.4",
     "inert": "^3.2.0",
     "joi": "^7.0.1",

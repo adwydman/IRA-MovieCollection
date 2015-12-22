@@ -122,7 +122,7 @@ server.prepareRoutes = function() {
     
     server.route({
         method: "POST",
-        path: "/me/{movie_id}",
+        path: "/me/movies/{movie_id}",
         config: {
             handler: handlers.postMeMovies,
             description: "User adds a new movie to his collection",
@@ -140,7 +140,7 @@ server.prepareRoutes = function() {
 
     server.route({
         method: "DELETE",
-        path: "/me/{movie_id}",
+        path: "/me/movies/{movie_id}",
         config: {
             handler: handlers.deleteMeMovies,
             description: "User deletes a movie from his collection",
@@ -158,10 +158,20 @@ server.prepareRoutes = function() {
 
     server.route({
         method: "GET",
+        path: "/me/movies",
+        config: {
+            handler: handlers.getMeMovies,
+            description: "User gets his own movie collection",
+            tags: ['api']
+        }
+    })
+
+    server.route({
+        method: "GET",
         path: "/me",
         config: {
             handler: handlers.getMe,
-            description: "User gets his own movie collection",
+            description: "User gets his own profile",
             tags: ['api']
         }
     })

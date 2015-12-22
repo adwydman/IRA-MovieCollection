@@ -126,10 +126,11 @@ var handlers = {
                     reply(return_object).code(return_object.code);
                 }
                 else {
-                    database.post("users", {"username": name, "password": password}, function(data){
+                    database.post("users", {"username": name, "password": password}, function(result){
                         return_object = { 
                             code: 201,
-                            message: "New user created"
+                            message: "New user created",
+                            data: result.ops[0]
                         }
                         reply(return_object).code(return_object.code);
                     });
@@ -185,7 +186,7 @@ var handlers = {
 
 
 	postMeMovies: function(request, reply){
-        console.log("POST /me/{movie_id}");
+        console.log("POST /me/movies/{movie_id}");
         if (request.state.session) {
             var session_id = request.state.session;
             var movie_id = request.params.movie_id;
@@ -224,7 +225,7 @@ var handlers = {
     },
 
     deleteMeMovies: function(request, reply) {
-        console.log("/DELETE /me/{movie_id}");
+        console.log("/DELETE /me/movies/{movie_id}");
         var movie_id = request.params.movie_id;
         if (request.state.session) {
             var session_id = request.state.session;
@@ -258,9 +259,34 @@ var handlers = {
             reply(return_object).code(return_object.code);  
         }
     },
-    
+
     getMe: function(request, reply) {
         console.log("GET /me");
+        if (request.state.session) {
+            var session_id = request.state.session;
+            database.get("sessions", {"session_id": session_id}, {}, function(data) {
+                var user_details = data[0];
+                database.get("users", {"username": user_details.username}, {"_id": 0, "username": 0}, function(result) {
+                    var return_object = {
+                        code: 200,
+                        user_id: user_details.user_id,
+                        username: user_details.username,
+                    }
+                    reply(return_object).code(return_object.code);
+                })
+            })
+        }
+        else {
+            var return_object = {
+                code: 403,
+                message: "You are not logged in"
+            }
+            reply(return_object).code(return_object.code);
+        }
+    },
+    
+    getMeMovies: function(request, reply) {
+        console.log("GET /me/movies");
         if (request.state.session) {
             var session_id = request.state.session;
             database.get("sessions", {"session_id": session_id}, {}, function(data) {
@@ -333,18 +359,30 @@ var handlers = {
                     if (name === undefined || year === undefined) {
                         return_object = { 
                             code: 403, 
-                            message: "Missing name of year" 
+                            message: "Missing name or year" 
                         }
                         reply(return_object).code(return_object.code);
                     }
                     else {
-                        database.post("movies", {"movie_name": name, "year": year}, function(data){
-                            return_object = { 
-                                code: 201, 
-                                message: "Movie has been successfully added"
+                        database.get("movies", {"movie_name": name}, {}, function(result) {
+                            if (result[0] !== undefined) {
+                                var return_object = { 
+                                    code: 409, 
+                                    "message": "Movie with given name already exists" 
+                                }
+                                reply(return_object).code(return_object.code);
                             }
-                            reply(return_object).code(return_object.code);
-                        });
+                            else {
+                                database.post("movies", {"movie_name": name, "year": year}, function(result){
+                                    return_object = { 
+                                        code: 201, 
+                                        message: "Movie has been successfully added",
+                                        data: result.ops[0]
+                                    }
+                                    reply(return_object).code(return_object.code);
+                                });
+                            }
+                        })
                     }
                 }
                 else {

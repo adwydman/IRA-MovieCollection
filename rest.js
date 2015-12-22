@@ -24,7 +24,7 @@ server.prepareRoutes = function() {
                 failAction: 'log'
             },
             description: 'Logs the user in',
-            notes: 'If user is already logged in, redirects to /movies',
+            notes: 'Logs the user in',
             tags: ['api'],
             validate: {
                 payload: {
@@ -45,7 +45,7 @@ server.prepareRoutes = function() {
         config: {
             handler: handlers.logout,
             description: 'Logs the user out',
-            notes: 'If user is already logged out, redirects to /movies',
+            notes: 'Logs the user out',
             tags: ['api']
         }
     });

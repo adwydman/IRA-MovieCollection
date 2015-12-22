@@ -177,7 +177,7 @@ var handlers = {
         }
         else {
             var return_object = {
-                code: 403,
+                code: 401,
                 message: "You are not logged in"
             }
             reply(return_object).code(return_object.code)
@@ -217,7 +217,7 @@ var handlers = {
         }
         else {
             var return_object = {
-                code: 403,
+                code: 401,
                 message: "You are not logged in"
             }
             reply(return_object).code(return_object.code);
@@ -235,7 +235,7 @@ var handlers = {
                     if (movieExists(result, movie_id)) {
                         database.delete("users_and_movies", {"username": user_details.username, movie_id: movie_id}, function(deletion) {
                             var return_object = {
-                                code: 200, 
+                                code: 204, 
                                 message: "Movie has been successfully deleted"
                             }
                             reply(return_object).code(return_object.code);
@@ -253,7 +253,7 @@ var handlers = {
         }
         else {
             var return_object = {
-                code: 403,
+                code: 401,
                 message: "You are not logged in"
             }
             reply(return_object).code(return_object.code);  
@@ -278,7 +278,7 @@ var handlers = {
         }
         else {
             var return_object = {
-                code: 403,
+                code: 401,
                 message: "You are not logged in"
             }
             reply(return_object).code(return_object.code);
@@ -305,7 +305,7 @@ var handlers = {
         }
         else {
             var return_object = {
-                code: 403,
+                code: 401,
                 message: "You are not logged in"
             }
             reply(return_object).code(return_object.code);
@@ -386,12 +386,20 @@ var handlers = {
                     }
                 }
                 else {
-                    // todo: not admin
+                    var return_object = {
+                        code: 403,
+                        message: "No access"
+                    }
+                    reply(return_object).code(return_object.code)
                 }
             })
         }
         else {
-            // todo: no session
+            var return_object = {
+                code: 401,
+                message: "You are not logged in"
+            }
+            reply(return_object).code(return_object.code)
         }
     },
 
@@ -451,12 +459,20 @@ var handlers = {
 		            }
         		}
         		else {
-        			// todo: not admin
+                    var return_object = {
+                        code: 403,
+                        message: "No access"
+                    }
+                    reply(return_object).code(return_object.code)
         		}
         	})
         }
         else {
-        	// todo: no session
+        	var return_object = {
+                code: 401,
+                message: "You are not logged in"
+            }
+            reply(return_object).code(return_object.code)
         }
     },
 
@@ -470,7 +486,7 @@ var handlers = {
 		            var id = request.params.id;
 		            database.delete("movies", {"_id": id}, function(){
 		                var return_object = {
-                            code: 200,
+                            code: 204,
 		                    message: "Movie has been deleted"
 		                }
 		                reply(return_object).code(return_object.code);
@@ -480,7 +496,7 @@ var handlers = {
         }
         else {
             var return_object = {
-                code: 403,
+                code: 401,
                 message: "You are not logged in"
             }
             reply(return_object).code(return_object.code);

@@ -186,7 +186,7 @@ server.prepareRoutes = function() {
             tags: ['api'],
             validate: {
                 payload: {
-                    movieName: Joi.string()
+                    movie_name: Joi.string()
                                .required()
                                .description("The name of the movie"),
                     year: Joi.number()

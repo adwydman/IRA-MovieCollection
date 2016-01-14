@@ -353,7 +353,7 @@ var handlers = {
             database.get("sessions", {"session_id": session_id}, {}, function(data) {
                 var user_details = data[0];
                 if (user_details.username === "admin") {
-                    var name = request.payload.movieName;
+                    var name = request.payload.movie_name;
                     var year = request.payload.year;
                     var return_object = {};
                     if (name === undefined || year === undefined) {

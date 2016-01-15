@@ -232,7 +232,7 @@ server.prepareRoutes = function() {
             tags: ['api'],
             validate: {
                 params: {
-                    id: Joi.number()
+                    id: Joi.string()
                         .required()
                         .description("Id of a movie")
                 }
